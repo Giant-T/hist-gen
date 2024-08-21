@@ -1,3 +1,10 @@
+use name_generator::generate_character_name;
+
+mod narrator;
+mod card;
+mod name_generator;
+
 fn main() {
-    println!("Hello, world!");
+    let name = generate_character_name();
+    println!("{}", name);
 }
