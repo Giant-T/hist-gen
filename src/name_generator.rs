@@ -1,10 +1,12 @@
 use rand::{seq::IteratorRandom, Rng};
 
+#[derive(Debug)]
 struct MarkovLink {
     pub state: char,
     pub p: u8,
 }
 
+#[derive(Debug)]
 struct MarkovChain {
     nodes: [Vec<MarkovLink>; 26],
 }
@@ -44,22 +46,28 @@ pub fn generate_character_name() -> String {
     let mut rng = rand::thread_rng();
     let mut name = String::new();
 
-    let mut state = ('a'..'z').choose(&mut rng).unwrap();
+    let mut state = ('a'..='z').choose(&mut rng).unwrap();
 
     let chain = parse_markov_file();
 
     name.push(state.to_ascii_uppercase());
 
-    while state != '_' {
-        state = chain.next_state(state, rng.gen());
-        name.push(state);
+    let mut should_end = false;
+    while (!should_end || name.len() <= 3) && name.len() < 20 {
+        let s = chain.next_state(state, rng.gen());
+        should_end = s == '_';
+
+        if !should_end {
+            name.push(state);
+            state = s;
+        }
     }
 
     return name;
 }
 
 fn parse_markov_file() -> MarkovChain {
-    let file = include_str!("../markov_nodes.txt");
+    let file = include_str!("../from_data.txt");
 
     let mut chain = MarkovChain::new();
 
@@ -78,18 +86,28 @@ fn parse_markov_file() -> MarkovChain {
 #[test]
 /// Verifies that all probabilities add up to 1
 fn markov_chain_verification() {
-    let file = include_str!("../markov_nodes.txt");
-    let mut nodes: [u8; 26] = [0; 26];
+    let chain = parse_markov_file();
 
-    file.lines().for_each(|line| {
-        let mut split = line.split(' ');
-        let letter = split.next().unwrap().as_bytes()[0];
-        let p: u8 = u8::from_str_radix(split.next_back().unwrap(), 10).unwrap();
+    let p: std::collections::HashMap<char, u8> = chain
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, links)| {
+            (
+                (b'a' + i as u8) as char,
+                links.iter().map(|link| link.p).sum(),
+            )
+        })
+        .filter(|x| x.1 != 255)
+        .collect();
 
-        nodes[(letter - b'a') as usize] += p;
-    });
+    println!("{p:?}");
 
-    let all_correct = nodes.iter().all(|p| *p == 255);
+    let all_correct = chain
+        .nodes
+        .iter()
+        .map(|links| links.iter().map(|link| link.p).sum())
+        .all(|p: u8| p == 255);
 
     assert!(all_correct);
 }

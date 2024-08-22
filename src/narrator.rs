@@ -30,11 +30,11 @@ impl<'a> Narrator<'a> {
         // advance the time accordingly
     }
 
-    fn pick_cards(self: &mut Self, n: u8) {
+    fn pick_cards(self: &mut Self, _n: u8) {
         // picks n cards from the top of the deck
     }
 
-    fn search_deck(self: &mut Self, card_name: &str) -> Option<Card> {
+    fn search_deck(self: &mut Self, _card_name: &str) -> Option<Card> {
         // search for a card in the deck and returns it
         // if it can be found and removes it from the deck
         return None;
@@ -45,7 +45,7 @@ impl<'a> Narrator<'a> {
         // then discard it
     }
 
-    fn discard_cards(self: &mut Self, n: u8) {
+    fn discard_cards(self: &mut Self, _n: u8) {
         // discards n cards randomly
     }
 }

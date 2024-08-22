@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use name_generator::generate_character_name;
 
 mod narrator;

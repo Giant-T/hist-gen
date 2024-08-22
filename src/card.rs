@@ -28,7 +28,7 @@ pub struct TemplateInfo<'a> {
     pub desc: &'a str,
 }
 
-pub fn parse_template(file_content: &str) -> Card {
+pub fn parse_template(_file_content: &str) -> Card {
     return Card::Template(
         TemplateInfo { card_type: CardType::Event, desc: "" }
     );
