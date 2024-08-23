@@ -1,3 +1,5 @@
+use crate::template::TemplateInfo;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Card<'a> {
     Card(CardInfo<'a>),
@@ -23,15 +25,3 @@ pub struct CardInfo<'a> {
     pub desc: &'a str,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct TemplateInfo<'a> {
-    pub card_type: CardType,
-    pub desc: &'a str,
-}
-
-pub fn parse_template(_file_content: &str) -> Card {
-    return Card::Template(TemplateInfo {
-        card_type: CardType::Event,
-        desc: "",
-    });
-}

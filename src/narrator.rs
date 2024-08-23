@@ -1,4 +1,7 @@
-use crate::card::Card;
+use crate::{
+    card::Card,
+    name_generator::{parse_markov_file, MarkovChain},
+};
 
 #[derive(Debug)]
 pub struct Narrator<'a> {
@@ -7,6 +10,7 @@ pub struct Narrator<'a> {
     hand: [Option<Box<Card<'a>>>; 10],
     discarded: Vec<Box<Card<'a>>>,
     deck: Vec<Box<Card<'a>>>,
+    pub chain: MarkovChain,
 }
 
 impl<'a> Narrator<'a> {
@@ -17,6 +21,7 @@ impl<'a> Narrator<'a> {
             hand: [None, None, None, None, None, None, None, None, None, None],
             deck: Vec::new(),
             discarded: Vec::new(),
+            chain: parse_markov_file(),
         }
     }
 
