@@ -7,7 +7,7 @@ struct MarkovLink {
 }
 
 #[derive(Debug)]
-struct MarkovChain {
+pub struct MarkovChain {
     nodes: [Vec<MarkovLink>; 26],
 }
 
@@ -42,32 +42,30 @@ impl MarkovChain {
 }
 
 /// Generates a name using a Markov Chain
-pub fn generate_character_name() -> String {
+pub fn generate_character_name(chain: &MarkovChain) -> String {
     let mut rng = rand::thread_rng();
     let mut name = String::new();
 
     let mut state = ('a'..='z').choose(&mut rng).unwrap();
 
-    let chain = parse_markov_file();
-
     name.push(state.to_ascii_uppercase());
 
     let mut should_end = false;
-    while (!should_end || name.len() <= 3) && name.len() < 20 {
+    while (!should_end || name.len() <= 3) && name.len() <= 12 {
         let s = chain.next_state(state, rng.gen());
         should_end = s == '_';
 
         if !should_end {
-            name.push(state);
             state = s;
+            name.push(state);
         }
     }
 
     return name;
 }
 
-fn parse_markov_file() -> MarkovChain {
-    let file = include_str!("../from_data.txt");
+pub fn parse_markov_file() -> MarkovChain {
+    let file = include_str!("../ressources/from_data.txt");
 
     let mut chain = MarkovChain::new();
 

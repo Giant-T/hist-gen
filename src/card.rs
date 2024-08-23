@@ -14,6 +14,7 @@ pub enum CardType {
     Event,
 }
 
+// Remember to use the command pattern for additional effects
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct CardInfo<'a> {
     pub card_type: CardType,
@@ -29,8 +30,8 @@ pub struct TemplateInfo<'a> {
 }
 
 pub fn parse_template(_file_content: &str) -> Card {
-    return Card::Template(
-        TemplateInfo { card_type: CardType::Event, desc: "" }
-    );
+    return Card::Template(TemplateInfo {
+        card_type: CardType::Event,
+        desc: "",
+    });
 }
-
