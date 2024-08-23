@@ -28,7 +28,7 @@ pub fn parse_template(path: &str) -> Result<Card, io::Error> {
         desc: "",
     };
 
-    let parsed = parse_toml(&content);
+    let parsed = parse_toml(&content).unwrap();
     println!("{parsed:?}");
 
     return Ok(Card::Template(template_info));

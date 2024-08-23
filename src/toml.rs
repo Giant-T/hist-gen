@@ -10,19 +10,25 @@ pub enum TomlType {
     Float(f64),
 }
 
-pub fn parse_toml(content: &str) -> HashMap<String, TomlType> {
+pub fn parse_toml(content: &str) -> Result<HashMap<String, TomlType>, ()> {
     let mut values = HashMap::new();
 
-    content.lines().for_each(|line| {
-        if line.starts_with('#') {
-            return;
+    // TODO: implement multiline strings, arrays and tables
+    content.lines().try_for_each(|line| {
+        let should_skip = line.starts_with('#') || line.trim().is_empty();
+        if should_skip {
+            return Ok(());
         }
 
-        let entry = parse_toml_table_entry(line).unwrap();
+        let entry = parse_toml_table_entry(line)?;
 
-        values.insert(entry.0, entry.1);
-    });
-    return values;
+        if let Some(_) = values.insert(entry.0, entry.1) {
+            return Err(());
+        }
+        return Ok(());
+    })?;
+
+    return Ok(values);
 }
 
 fn parse_toml_table_entry(str: &str) -> Result<(String, TomlType), ()> {
@@ -30,9 +36,9 @@ fn parse_toml_table_entry(str: &str) -> Result<(String, TomlType), ()> {
         return Err(());
     }
 
-    let split = str.split_once('=').unwrap();
+    let split = str.split_once('=').ok_or(())?;
     let ident = split.0.trim();
-    let value = parse_toml_value(split.1.trim()).unwrap();
+    let value = parse_toml_value(split.1.trim())?;
 
     return Ok((ident.into(), value));
 }
@@ -46,16 +52,17 @@ fn parse_toml_value(str: &str) -> Result<TomlType, ()> {
         let end = str.len() - 1;
         let arr = str[1..end]
             .split(',')
-            .map(|x| parse_toml_value(x.trim()).unwrap())
-            .collect();
+            .map(|x| parse_toml_value(x.trim()))
+            .collect::<Result<Vec<_>, ()>>()?;
 
         return Ok(TomlType::Array(arr));
     } else if str.starts_with('{') && str.ends_with('}') {
+        // Parse each element of the table
         let end = str.len() - 1;
         let table = str[1..end]
             .split(',')
-            .map(|x| parse_toml_table_entry(x.trim()).unwrap())
-            .collect();
+            .map(|x| parse_toml_table_entry(x.trim()))
+            .collect::<Result<HashMap<_, _>, ()>>()?;
 
         return Ok(TomlType::Table(table));
     } else if let Ok(int) = str.parse::<u32>() {
@@ -66,3 +73,5 @@ fn parse_toml_value(str: &str) -> Result<TomlType, ()> {
 
     return Err(());
 }
+
+// TODO: make up some parser tests
