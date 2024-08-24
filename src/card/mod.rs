@@ -1,6 +1,8 @@
 use std::str::FromStr;
 
-use crate::template::TemplateInfo;
+pub mod template;
+
+use template::TemplateInfo;
 
 #[derive(Debug, PartialEq)]
 pub enum Card {

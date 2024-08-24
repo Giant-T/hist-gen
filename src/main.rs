@@ -4,12 +4,11 @@ use std::{error::Error, time::SystemTime};
 
 use name_generator::generate_character_name;
 use narrator::Narrator;
-use template::parse_template;
+use card::template::parse_template;
 
 mod card;
 mod name_generator;
 mod narrator;
-mod template;
 mod toml;
 
 fn main() -> Result<(), Box<dyn Error>> {

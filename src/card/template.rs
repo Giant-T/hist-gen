@@ -38,10 +38,12 @@ impl TryFrom<HashMap<String, TomlType>> for TemplateInfo {
             return Err(TemplateError);
         };
 
+        let card_type = CardType::from_str(card_type.as_str()).or(Err(TemplateError))?;
+
         Ok(TemplateInfo {
             title: title.to_string(),
             desc: desc.to_string(),
-            card_type: CardType::from_str(card_type.as_str()).or(Err(TemplateError))?,
+            card_type,
         })
     }
 }
@@ -56,3 +58,5 @@ pub fn parse_template(path: &str) -> Result<Card, Box<dyn Error>> {
 
     return Ok(Card::Template(template_info));
 }
+
+// TODO: Make up template parsing tests
