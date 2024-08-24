@@ -4,16 +4,16 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Narrator<'a> {
+pub struct Narrator {
     year: u32,
     history: String,
-    hand: [Option<Box<Card<'a>>>; 10],
-    discarded: Vec<Box<Card<'a>>>,
-    deck: Vec<Box<Card<'a>>>,
+    hand: [Option<Box<Card>>; 10],
+    discarded: Vec<Box<Card>>,
+    deck: Vec<Box<Card>>,
     pub chain: MarkovChain,
 }
 
-impl<'a> Narrator<'a> {
+impl Narrator {
     pub fn new() -> Self {
         Narrator {
             year: 0,
@@ -30,6 +30,7 @@ impl<'a> Narrator<'a> {
         if self.hand.contains(&None) {
             self.pick_cards(1);
         }
+        todo!();
         // plays a card from his hand and discards it
         // writes history
         // advance the time accordingly
@@ -37,20 +38,23 @@ impl<'a> Narrator<'a> {
 
     fn pick_cards(self: &mut Self, _n: u8) {
         // picks n cards from the top of the deck
+        todo!();
     }
 
     fn search_deck(self: &mut Self, _card_name: &str) -> Option<Card> {
         // search for a card in the deck and returns it
         // if it can be found and removes it from the deck
-        return None;
+        todo!();
     }
 
     fn play_cards(self: &mut Self) {
         // pick card randomly from hand play its effects
         // then discard it
+        todo!();
     }
 
     fn discard_cards(self: &mut Self, _n: u8) {
         // discards n cards randomly
+        todo!();
     }
 }

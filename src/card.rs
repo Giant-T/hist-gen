@@ -1,27 +1,47 @@
+use std::str::FromStr;
+
 use crate::template::TemplateInfo;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Card<'a> {
-    Card(CardInfo<'a>),
-    Template(TemplateInfo<'a>),
+#[derive(Debug, PartialEq)]
+pub enum Card {
+    Card(CardInfo),
+    Template(TemplateInfo),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum CardType {
-    Hero,
-    Faction,
     Artifact,
-    Wonder,
     Chaos,
     Event,
+    Faction,
+    Hero,
+    Wonder,
+}
+
+#[derive(Debug)]
+pub struct CardTypeError;
+
+impl FromStr for CardType {
+    type Err = CardTypeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Artifact" => Ok(Self::Artifact),
+            "Chaos" => Ok(Self::Chaos),
+            "Event" => Ok(Self::Event),
+            "Faction" => Ok(Self::Faction),
+            "Hero" => Ok(Self::Hero),
+            "Wonder" => Ok(Self::Wonder),
+            _ => Err(CardTypeError),
+        }
+    }
 }
 
 // Remember to use the command pattern for additional effects
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct CardInfo<'a> {
+#[derive(Debug, PartialEq)]
+pub struct CardInfo {
     pub card_type: CardType,
     pub year: u32,
-    pub name: &'a str,
-    pub desc: &'a str,
+    pub name: String,
+    pub desc: String,
 }
-

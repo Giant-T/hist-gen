@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, error::Error, fmt};
 
 #[derive(Debug)]
 pub enum TomlType {
@@ -6,7 +6,7 @@ pub enum TomlType {
     Boolean(bool),
     Array(Vec<TomlType>),
     Table(HashMap<String, TomlType>),
-    Integer(u32),
+    Integer(i32),
     Float(f64),
 }
 
@@ -18,6 +18,15 @@ pub enum TomlError {
 
 type TomlResult<T> = Result<T, TomlError>;
 
+impl Error for TomlError {}
+
+impl fmt::Display for TomlError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Error in TOML: wrong syntax or unimplemented features.")
+    }
+}
+
+/// Parses toml content (alternative number formats, dates and string escape sequences are not supported (._.) )
 pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
     let mut values = HashMap::new();
 
@@ -58,6 +67,9 @@ pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
     return Ok(values);
 }
 
+/// Parses a toml entry
+/// ex:
+/// &nbsp; ident = value
 fn parse_toml_table_entry(str: &str) -> TomlResult<(String, TomlType)> {
     if !str.contains('=') {
         return Err(TomlError::InvalidToml);
@@ -70,13 +82,24 @@ fn parse_toml_table_entry(str: &str) -> TomlResult<(String, TomlType)> {
     return Ok((ident.into(), value));
 }
 
+/// Parses a toml value depending on its type
 fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
-    if str.starts_with("\"\"\"") && str.ends_with("\"\"\"") {
+    if str.starts_with("\"\"\"") {
+        if !str.ends_with("\"\"\"") {
+            return Err(TomlError::InvalidToml);
+        }
         return Ok(TomlType::String(parse_multiline_str(str)));
-    } else if str.starts_with('"') && str.ends_with('"') {
+    } else if str.starts_with('"') {
+        if !str.ends_with('"') {
+            return Err(TomlError::InvalidToml);
+        }
         let end = str.len() - 1;
         return Ok(TomlType::String(str[1..end].into()));
-    } else if str.starts_with('[') && str.ends_with(']') {
+    } else if str.starts_with('[') {
+        if !str.ends_with(']') {
+            return Err(TomlError::InvalidToml);
+        }
+
         // Parse each element of the array
         let end = str.len() - 1;
         let arr = str[1..end]
@@ -85,7 +108,11 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
             .collect::<TomlResult<Vec<_>>>()?;
 
         return Ok(TomlType::Array(arr));
-    } else if str.starts_with('{') && str.ends_with('}') {
+    } else if str.starts_with('{') {
+        if !str.ends_with('}') {
+            return Err(TomlError::InvalidToml);
+        }
+
         // Parse each element of the table
         let end = str.len() - 1;
         let table = str[1..end]
@@ -94,15 +121,16 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
             .collect::<TomlResult<HashMap<_, _>>>()?;
 
         return Ok(TomlType::Table(table));
-    } else if let Ok(int) = str.parse::<u32>() {
+    } else if let Ok(int) = str.parse() {
         return Ok(TomlType::Integer(int));
-    } else if let Ok(float) = str.parse::<f64>() {
+    } else if let Ok(float) = str.parse() {
         return Ok(TomlType::Float(float));
     }
 
     return Err(TomlError::ParsingError);
 }
 
+/// Parses a multiline string
 fn parse_multiline_str(str: &str) -> String {
     let end = str.len() - 3;
 
