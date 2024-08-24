@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fmt};
+use std::{cmp::min, collections::HashMap, error::Error, fmt};
 
 #[derive(Debug)]
 pub enum TomlType {
@@ -36,17 +36,18 @@ pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
 
     while end < content.len() {
         let mut looking_for = "\n";
-        while end < content.len() && !content[..=end].ends_with(looking_for) {
+        while end < content.len() - 1 && !content[..=end].ends_with(looking_for) {
             if looking_for != "\"\"\"\n" && content[..=end].ends_with("\"\"\"") {
                 looking_for = "\"\"\"\n";
-                end += 1;
+                end = min(content.len() - 1, end + 1);
             } else if content[..=end].ends_with('{') {
                 looking_for = "}\n";
             } else if content[..=end].ends_with('[') {
                 looking_for = "]\n";
             }
-            end += 1;
+            end = min(content.len() - 1, end + 1);
         }
+
         let line = &content[start..=end];
 
         end += 1;
@@ -85,12 +86,12 @@ fn parse_toml_table_entry(str: &str) -> TomlResult<(String, TomlType)> {
 /// Parses a toml value depending on its type
 fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
     if str.starts_with("\"\"\"") {
-        if !str.ends_with("\"\"\"") {
+        if str.len() <= 6 || !str.ends_with("\"\"\"") {
             return Err(TomlError::InvalidToml);
         }
         return Ok(TomlType::String(parse_multiline_str(str)));
     } else if str.starts_with('"') {
-        if !str.ends_with('"') {
+        if str.len() == 1 || !str.ends_with('"') {
             return Err(TomlError::InvalidToml);
         }
         let end = str.len() - 1;
@@ -132,21 +133,83 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
 
 /// Parses a multiline string
 fn parse_multiline_str(str: &str) -> String {
-    let end = str.len() - 3;
+    let mut string = String::new();
+    let mut lines = str[3..].lines().peekable();
 
-    str[3..end]
-        .lines()
-        .map(|line| {
-            let line = line.trim_start();
-            if line.ends_with('\\') {
-                let end = line.len() - 1;
-                return line[..end].into();
-            }
-            let mut l = line.to_string();
-            l.push('\n');
-            return l;
-        })
-        .collect()
+    while let Some(line) = lines.next() {
+        let line = line.trim_start();
+        if line.ends_with('\\') {
+            let end = line.len() - 1;
+            string.push_str(line[..end].into());
+            continue;
+        }
+        if lines.peek().is_none() {
+            string.push_str(&line[..(line.len() - 3)]);
+            continue;
+        }
+        string.push_str(line);
+        string.push('\n');
+    }
+
+    return string;
 }
 
 // TODO: make up some parser tests
+#[cfg(test)]
+mod test {
+    use crate::toml::TomlType;
+
+    use super::parse_toml;
+    use std::{
+        fs::{read_dir, File},
+        io::Read,
+    };
+
+    #[test]
+    fn test_wrong_templates() {
+        let paths = read_dir("ressources/templates/tests/invalid-syntax").unwrap();
+
+        for path in paths {
+            let path = path.unwrap().path();
+            let mut content = String::new();
+            let mut file = File::open(&path).unwrap();
+            file.read_to_string(&mut content).unwrap();
+
+            assert!(parse_toml(&content).is_err());
+        }
+    }
+
+    #[test]
+    fn test_string_templates() {
+        let mut content = String::new();
+        let mut file = File::open("ressources/templates/tests/valid/string.toml").unwrap();
+        file.read_to_string(&mut content).unwrap();
+
+        let toml = parse_toml(&content).unwrap();
+
+        let TomlType::String(t) = toml.get("t1").unwrap() else {
+            return assert!(false);
+        };
+        assert_eq!("", t);
+
+        let TomlType::String(t) = toml.get("t2").unwrap() else {
+            return assert!(false);
+        };
+        assert_eq!("1", t);
+
+        let TomlType::String(t) = toml.get("t3").unwrap() else {
+            return assert!(false);
+        };
+        assert_eq!("test", t);
+
+        let TomlType::String(t) = toml.get("t4").unwrap() else {
+            return assert!(false);
+        };
+        assert_eq!("\ntest\n", t);
+
+        let TomlType::String(t) = toml.get("t5").unwrap() else {
+            return assert!(false);
+        };
+        assert_eq!("test", t);
+    }
+}

@@ -1,5 +1,4 @@
-use core::str;
-use std::{collections::HashMap, error::Error, fmt, fs::File, io::Read, str::FromStr};
+use std::{collections::HashMap, error::Error, fmt, fs::File, io::Read, path::Path, str::FromStr};
 
 use crate::{
     card::{Card, CardType},
@@ -48,7 +47,10 @@ impl TryFrom<HashMap<String, TomlType>> for TemplateInfo {
     }
 }
 
-pub fn parse_template(path: &str) -> Result<Card, Box<dyn Error>> {
+pub fn parse_template<P>(path: P) -> Result<Card, Box<dyn Error>>
+where
+    P: AsRef<Path>,
+{
     let mut file = File::open(path)?;
 
     let mut content = String::new();
