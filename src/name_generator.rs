@@ -61,6 +61,16 @@ pub fn generate_character_name(chain: &MarkovChain) -> String {
         }
     }
 
+    if name
+        .as_bytes()
+        .windows(2)
+        .map(|x| if x[0] == x[1] { 1 } else { 0 })
+        .sum::<u8>()
+        >= 3
+    {
+        name = generate_character_name(chain);
+    }
+
     return name;
 }
 

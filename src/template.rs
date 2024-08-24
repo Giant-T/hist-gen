@@ -22,7 +22,7 @@ pub fn parse_template(path: &str) -> Result<Card, io::Error> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    let mut template_info = TemplateInfo {
+    let template_info = TemplateInfo {
         card_type: CardType::Event,
         title: "",
         desc: "",
