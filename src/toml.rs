@@ -27,6 +27,7 @@ impl fmt::Display for TomlError {
 }
 
 /// Parses toml content (alternative number formats, dates and string escape sequences are not supported (._.) )
+/// , also comments can only be found at the start of a line
 pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
     let mut values = HashMap::new();
 
@@ -34,7 +35,26 @@ pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
     let mut start: usize = 0;
     let mut end: usize = 0;
 
+    let mut section: Option<&str> = None;
+
     while end < content.len() {
+        if content[start..=end].starts_with('[') {
+            // Parse section header
+            while end < content.len() && !content[..=end].ends_with("]\n") {
+                end += 1;
+            }
+
+            section = Some(&content[(start + 1)..(end - 1)]);
+            if let Some(_) = values.insert(
+                content[(start + 1)..(end - 1)].into(),
+                TomlType::Table(HashMap::new()),
+            ) {
+                return Err(TomlError::InvalidToml);
+            }
+            end = min(content.len() - 1, end + 1);
+            start = end;
+        }
+
         let mut looking_for = "\n";
         while end < content.len() - 1 && !content[..=end].ends_with(looking_for) {
             if looking_for != "\"\"\"\n" && content[..=end].ends_with("\"\"\"") {
@@ -60,6 +80,16 @@ pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
 
         let entry = parse_toml_table_entry(line)?;
 
+        // If in a section insert into this section
+        if let Some(s) = section {
+            if let TomlType::Table(table) = values.get_mut(s).unwrap() {
+                if let Some(_) = table.insert(entry.0, entry.1) {
+                    return Err(TomlError::InvalidToml);
+                }
+                continue;
+            }
+        }
+
         if let Some(_) = values.insert(entry.0, entry.1) {
             return Err(TomlError::InvalidToml);
         }
@@ -70,7 +100,7 @@ pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
 
 /// Parses a toml entry
 /// ex:
-/// &nbsp; ident = value
+///     ident = value
 fn parse_toml_table_entry(str: &str) -> TomlResult<(String, TomlType)> {
     if !str.contains('=') {
         return Err(TomlError::InvalidToml);
@@ -147,6 +177,7 @@ fn parse_multiline_str(str: &str) -> String {
             string.push_str(&line[..(line.len() - 3)]);
             continue;
         }
+        // Add newline if no '\'
         string.push_str(line);
         string.push('\n');
     }
@@ -174,8 +205,9 @@ mod test {
             let mut content = String::new();
             let mut file = File::open(&path).unwrap();
             file.read_to_string(&mut content).unwrap();
-
-            assert!(parse_toml(&content).is_err());
+            let t = parse_toml(&content);
+            println!("{t:?}");
+            assert!(t.is_err());
         }
     }
 
