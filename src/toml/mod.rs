@@ -87,10 +87,10 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
         }
         return Ok(TomlType::String(parse_multiline_str(str)));
     } else if str.starts_with('"') {
-        if str.len() == 1 || !str.ends_with('"') || str.contains('\n') {
+        let end = str.len() - 1;
+        if str.len() == 1 || !str.ends_with('"') || str.contains('\n') || str[1..end].contains('"') {
             return Err(TomlError::InvalidToml);
         }
-        let end = str.len() - 1;
         return Ok(TomlType::String(str[1..end].into()));
     } else if str.starts_with('[') {
         if !str.ends_with(']') {

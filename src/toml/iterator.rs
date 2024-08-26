@@ -124,19 +124,23 @@ impl<'a> Iterator for TomlIterator<'a> {
 #[derive(Debug)]
 struct PairMatcher {
     pairs_queue: Vec<char>,
+    str_n: usize,
 }
 
 impl PairMatcher {
     pub fn new() -> Self {
         Self {
             pairs_queue: Vec::new(),
+            str_n: 0,
         }
     }
 
     pub fn valid(&self) -> bool {
-        return self.pairs_queue.is_empty();
+        return self.pairs_queue.len() == self.str_n;
     }
 
+    /// Adds a character to the pairs if it can be paired
+    /// Errors if a pair closes before the first opened
     pub fn add_char(&mut self, c: char) -> TomlResult<()> {
         if !"\"[]{}".contains(c) {
             return Ok(());
@@ -144,9 +148,15 @@ impl PairMatcher {
 
         match (c, self.pairs_queue.last()) {
             ('[' | '{', Some('"')) | ('"', None) => {
+                if c == '"' {
+                    self.str_n += 1;
+                }
                 self.pairs_queue.push(c);
             }
             ('"', Some('"')) | (']', Some('[')) | ('}', Some('{')) => {
+                if c == '"' {
+                    self.str_n -= 1;
+                }
                 self.pairs_queue.pop();
             }
             _ => {
