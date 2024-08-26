@@ -26,89 +26,150 @@ impl fmt::Display for TomlError {
     }
 }
 
-/// Parses toml content (alternative number formats, dates and string escape sequences are not supported (._.) )
-/// , also comments can only be found at the start of a line
-pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
-    let mut values = HashMap::new();
+struct TomlIterator<'a> {
+    remaining: &'a str,
+}
 
-    // TODO: implement sections
-    let mut start: usize = 0;
-    let mut end: usize = 0;
+impl<'a> TomlIterator<'a> {
+    pub fn new(str: &'a str) -> TomlIterator<'a> {
+        TomlIterator { remaining: str }
+    }
+}
 
-    let mut section: Option<&str> = None;
-
-    while end < content.len() {
-        if content[start..=end].starts_with('[') {
-            // Parse section header
-            while end < content.len() && !content[..=end].ends_with("]\n") {
-                end += 1;
-            }
-
-            section = Some(&content[(start + 1)..(end - 1)]);
-            if let Some(_) = values.insert(
-                content[(start + 1)..(end - 1)].into(),
-                TomlType::Table(HashMap::new()),
-            ) {
-                return Err(TomlError::InvalidToml);
-            }
-            end = min(content.len() - 1, end + 1);
-            start = end;
+impl<'a> TomlIterator<'a> {
+    fn next_section(&mut self) -> TomlResult<(&'a str, &'a str)> {
+        let mut idx = 0;
+        while idx < self.remaining.len() && !self.remaining[..=idx].ends_with('\n') {
+            idx += 1;
         }
 
-        let mut looking_for = "\n";
-        while end < content.len() - 1 && !content[..=end].ends_with(looking_for) {
-            if looking_for != "\"\"\"\n" && content[..=end].ends_with("\"\"\"") {
-                looking_for = "\"\"\"\n";
-                end = min(content.len() - 1, end + 1);
-            } else if content[..=end].ends_with('{') {
-                looking_for = "}\n";
-            } else if content[..=end].ends_with('[') {
-                looking_for = "]\n";
-            }
-            end = min(content.len() - 1, end + 1);
-        }
-
-        let line = &content[start..=end];
-
-        end += 1;
-        start = end;
-
-        let should_skip = line.starts_with('#') || line.trim().is_empty();
-        if should_skip {
-            continue;
-        }
-
-        let entry = parse_toml_table_entry(line)?;
-
-        // If in a section insert into this section
-        if let Some(s) = section {
-            if let TomlType::Table(table) = values.get_mut(s).unwrap() {
-                if let Some(_) = table.insert(entry.0, entry.1) {
-                    return Err(TomlError::InvalidToml);
-                }
-                continue;
-            }
-        }
-
-        if let Some(_) = values.insert(entry.0, entry.1) {
+        if !self.remaining[..idx].ends_with("]") {
             return Err(TomlError::InvalidToml);
         }
+
+        let ident = &self.remaining[..idx];
+
+        self.remaining = &self.remaining[idx..];
+        idx = 0;
+
+        while idx < self.remaining.len() && !self.remaining[..=idx].ends_with("\n[") {
+            idx += 1;
+        }
+
+        let value = &self.remaining[..idx].trim_start();
+        self.remaining = &self.remaining[idx..];
+
+        return Ok((ident, value));
     }
+
+    fn skip_comments(&mut self) {
+        let mut idx = 0;
+
+        while self.remaining.starts_with('#') {
+            while idx < self.remaining.len() && !self.remaining[..=idx].ends_with('\n') {
+                idx += 1;
+            }
+            idx = min(self.remaining.len() - 1, idx + 1);
+            self.remaining = self.remaining[idx..].trim_start();
+            idx = 0;
+        }
+    }
+}
+
+impl<'a> Iterator for TomlIterator<'a> {
+    type Item = TomlResult<(&'a str, &'a str)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.remaining = self.remaining.trim_start();
+
+        self.skip_comments();
+
+        // No more content to parse
+        if self.remaining.is_empty() {
+            return None;
+        }
+
+        // Check for section
+        if self.remaining.starts_with('[') {
+            return Some(self.next_section());
+        }
+
+        let Some(split) = self.remaining.split_once('=') else {
+            return Some(Err(TomlError::InvalidToml));
+        };
+
+        let ident = split.0.trim();
+
+        let mut matching = "\n";
+
+        let mut idx = 0;
+        while idx < split.1.len() && !split.1[..=idx].ends_with(matching) {
+            if matching == "\n" {
+                if matching != "\"\"\"\n" && split.1[..=idx].ends_with("\"\"\"") {
+                    matching = "\"\"\"\n";
+                    idx = min(self.remaining.len() - 1, idx + 1);
+                } else if split.1[..=idx].ends_with('{') {
+                    matching = "}\n";
+                } else if split.1[..=idx].ends_with('[') {
+                    matching = "]\n";
+                }
+            }
+            idx = min(self.remaining.len() - 1, idx + 1);
+        }
+
+        let value = split.1[..idx].trim();
+
+        self.remaining = &split.1[idx..];
+
+        return Some(Ok((ident, value)));
+    }
+}
+
+/// Parses toml content (alternative number formats, dates and string escape sequences are not supported (._.))
+/// Also, comments can only be found at the start of a line
+pub fn parse_toml(content: &str) -> TomlResult<HashMap<String, TomlType>> {
+    let mut iter = TomlIterator::new(content);
+
+    let mut values: HashMap<String, TomlType> = HashMap::new();
+
+    iter.try_for_each(|x| {
+        let (ident, value) = x?;
+
+        let entry = parse_toml_table_entry(ident, value)?;
+
+        if values.contains_key(&entry.0) {
+            return Err(TomlError::InvalidToml);
+        }
+
+        values.insert(entry.0, entry.1);
+
+        Ok(())
+    })?;
 
     return Ok(values);
 }
 
 /// Parses a toml entry
-/// ex:
-///     ident = value
-fn parse_toml_table_entry(str: &str) -> TomlResult<(String, TomlType)> {
-    if !str.contains('=') {
-        return Err(TomlError::InvalidToml);
+fn parse_toml_table_entry(ident: &str, value: &str) -> TomlResult<(String, TomlType)> {
+    if ident.starts_with('[') && ident.ends_with(']') {
+        let ident = &ident[1..(ident.len() - 1)];
+        let mut iter = TomlIterator::new(value);
+        let mut values: HashMap<String, TomlType> = HashMap::new();
+        iter.try_for_each(|x| {
+            let (ident, value) = x?;
+
+            if values.contains_key(ident) {
+                return Err(TomlError::InvalidToml);
+            }
+
+            values.insert(ident.into(), parse_toml_value(value)?);
+
+            Ok(())
+        })?;
+        return Ok((ident.into(), TomlType::Table(values)));
     }
 
-    let split = str.split_once('=').unwrap();
-    let ident = split.0.trim();
-    let value = parse_toml_value(split.1.trim())?;
+    let value = parse_toml_value(value)?;
 
     return Ok((ident.into(), value));
 }
@@ -121,7 +182,7 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
         }
         return Ok(TomlType::String(parse_multiline_str(str)));
     } else if str.starts_with('"') {
-        if str.len() == 1 || !str.ends_with('"') {
+        if str.len() == 1 || !str.ends_with('"') || str.contains('\n') {
             return Err(TomlError::InvalidToml);
         }
         let end = str.len() - 1;
@@ -148,7 +209,15 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
         let end = str.len() - 1;
         let table = str[1..end]
             .split(',')
-            .map(|x| parse_toml_table_entry(x.trim()))
+            .filter(|x| !x.trim().is_empty())
+            .map(|x| {
+                let Some(split) = x.split_once('=') else {
+                    return Err(TomlError::InvalidToml);
+                };
+
+                let val = parse_toml_value(split.1.trim())?;
+                return Ok((split.0.trim().into(), val));
+            })
             .collect::<TomlResult<HashMap<_, _>>>()?;
 
         return Ok(TomlType::Table(table));
