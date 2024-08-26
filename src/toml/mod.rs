@@ -1,4 +1,8 @@
-use std::{cmp::min, collections::HashMap, error::Error, fmt};
+use std::{collections::HashMap, error::Error, fmt};
+
+use iterator::TomlIterator;
+
+pub mod iterator;
 
 #[derive(Debug)]
 pub enum TomlType {
@@ -23,105 +27,6 @@ impl Error for TomlError {}
 impl fmt::Display for TomlError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Error in TOML: wrong syntax or unimplemented features.")
-    }
-}
-
-struct TomlIterator<'a> {
-    remaining: &'a str,
-}
-
-impl<'a> TomlIterator<'a> {
-    pub fn new(str: &'a str) -> TomlIterator<'a> {
-        TomlIterator { remaining: str }
-    }
-}
-
-impl<'a> TomlIterator<'a> {
-    fn next_section(&mut self) -> TomlResult<(&'a str, &'a str)> {
-        let mut idx = 0;
-        while idx < self.remaining.len() && !self.remaining[..=idx].ends_with('\n') {
-            idx += 1;
-        }
-
-        if !self.remaining[..idx].ends_with("]") {
-            return Err(TomlError::InvalidToml);
-        }
-
-        let ident = &self.remaining[..idx];
-
-        self.remaining = &self.remaining[idx..];
-        idx = 0;
-
-        while idx < self.remaining.len() && !self.remaining[..=idx].ends_with("\n[") {
-            idx += 1;
-        }
-
-        let value = &self.remaining[..idx].trim_start();
-        self.remaining = &self.remaining[idx..];
-
-        return Ok((ident, value));
-    }
-
-    fn skip_comments(&mut self) {
-        let mut idx = 0;
-
-        while self.remaining.starts_with('#') {
-            while idx < self.remaining.len() && !self.remaining[..=idx].ends_with('\n') {
-                idx += 1;
-            }
-            idx = min(self.remaining.len() - 1, idx + 1);
-            self.remaining = self.remaining[idx..].trim_start();
-            idx = 0;
-        }
-    }
-}
-
-impl<'a> Iterator for TomlIterator<'a> {
-    type Item = TomlResult<(&'a str, &'a str)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.remaining = self.remaining.trim_start();
-
-        self.skip_comments();
-
-        // No more content to parse
-        if self.remaining.is_empty() {
-            return None;
-        }
-
-        // Check for section
-        if self.remaining.starts_with('[') {
-            return Some(self.next_section());
-        }
-
-        let Some(split) = self.remaining.split_once('=') else {
-            return Some(Err(TomlError::InvalidToml));
-        };
-
-        let ident = split.0.trim();
-
-        let mut matching = "\n";
-
-        let mut idx = 0;
-        while idx < split.1.len() && !split.1[..=idx].ends_with(matching) {
-            if matching == "\n" {
-                if matching != "\"\"\"\n" && split.1[..=idx].ends_with("\"\"\"") {
-                    matching = "\"\"\"\n";
-                    idx = min(self.remaining.len() - 1, idx + 1);
-                } else if split.1[..=idx].ends_with('{') {
-                    matching = "}\n";
-                } else if split.1[..=idx].ends_with('[') {
-                    matching = "]\n";
-                }
-            }
-            idx = min(self.remaining.len() - 1, idx + 1);
-        }
-
-        let value = split.1[..idx].trim();
-
-        self.remaining = &split.1[idx..];
-
-        return Some(Ok((ident, value)));
     }
 }
 
@@ -191,6 +96,9 @@ fn parse_toml_value(str: &str) -> TomlResult<TomlType> {
         if !str.ends_with(']') {
             return Err(TomlError::InvalidToml);
         }
+
+        // TODO: use a stack of closing and opening commas to split entries of
+        //      tables and arrays
 
         // Parse each element of the array
         let end = str.len() - 1;
